@@ -20,17 +20,20 @@ func main() {
 		log.Fatalf("Error - no connection to the database: %s", err)
 	}
 	const filepathRoot = "."
-	const port = "8080"
+	const port = "8081"
 
 	var apiCfg apiConfig
 	apiCfg.dbQueries = database.New(db)
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+	mux.Handle("/screenshots/", http.StripPrefix("/screenshots/", http.FileServer(http.Dir("./screenshots"))))
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerMetricsResett)
 	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
+	mux.HandleFunc("GET /api/download_zip", handlerDownloadZip)
+	mux.HandleFunc("POST /api/upload_screenshot", apiCfg.handlerUploadScreenshot)
 
 	srv := &http.Server{
 		Addr:    ":" + port,

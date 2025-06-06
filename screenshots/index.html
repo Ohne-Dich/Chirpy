@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Screenshot-Upload</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+    }
+    .preview img {
+      max-width: 100%;
+      transform: scale(0.35); /* 35% Vorschau */
+      transform-origin: top left;
+      border: 1px solid #ccc;
+      margin-top: 1rem;
+    }
+    input[type="number"] {
+      width: 80px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Screenshot hochladen & zuschneiden</h1>
+
+  <form id="uploadForm">
+    <label>Bild auswählen:
+      <input type="file" name="screenshot" accept="image/*" required multiple>
+    </label><br><br>
+
+    <label>Crop-Höhe (Pixel von unten):
+      <input type="number" name="crop" id="cropInput" value="40" min="0">
+    </label><br><br>
+
+    <button type="submit">Hochladen</button>
+  </form>
+
+  <div class="preview" id="previewContainer"></div>
+
+  <hr>
+
+  <button onclick="downloadZip()">📥 ZIP herunterladen</button>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const previewContainer = document.getElementById('previewContainer');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const fileInput = form.querySelector('input[type="file"]');
+      const cropInput = document.getElementById('cropInput');
+      const formData = new FormData();
+      formData.append('screenshot', fileInput.files[0]);
+      formData.append('crop', cropInput.value); // an Backend senden
+
+      const response = await fetch('/api/upload_screenshot', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const text = await response.text();
+      alert(text);
+
+      // Preview anzeigen
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        previewContainer.innerHTML = `<img src="${e.target.result}" alt="Vorschau">`;
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    });
+
+    function downloadZip() {
+      window.location.href = '/api/download_zip';
+    }
+  </script>
+</body>
+</html>
