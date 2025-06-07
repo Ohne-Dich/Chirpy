@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Ohne-Dich/Chirpy/internal/database"
 	"github.com/google/uuid"
@@ -15,13 +14,7 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 		Body    string    `json:"body"`
 		User_ID uuid.UUID `json:"user_id"`
 	}
-	type returnVals struct {
-		Id         uuid.UUID `json:"id"`
-		Created_at time.Time `json:"created_at"`
-		Updated_at time.Time `json:"updated_at"`
-		Body       string    `json:"body"`
-		User_id    uuid.UUID `json:"user_id"`
-	}
+
 	// validating, get the body
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
