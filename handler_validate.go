@@ -50,7 +50,7 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 	}
 
 	//returning
-	respondWithJSON(w, 201, returnVals{
+	respondWithJSON(w, http.StatusCreated, returnVals{
 		Id:         chirp.ID,
 		Created_at: chirp.CreatedAt,
 		Updated_at: chirp.UpdatedAt,
