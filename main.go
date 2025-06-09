@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
 	platform       string
+	token_secret   string
 }
 
 func main() {
@@ -35,10 +36,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error - no connection to the database: %s", err)
 	}
+	secret := os.Getenv("TOKEN_SECRET")
+	if secret == "" {
+		log.Fatalf("TOKEN_SECRET must be set")
+	}
 
 	var apiCfg apiConfig
 	apiCfg.dbQueries = database.New(db)
 	apiCfg.platform = platform
+	apiCfg.token_secret = secret
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))

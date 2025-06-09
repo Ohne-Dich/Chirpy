@@ -5,20 +5,32 @@ import (
 	"net/http"
 	"strings"
 
+	auth "github.com/Ohne-Dich/Chirpy/internal"
 	"github.com/Ohne-Dich/Chirpy/internal/database"
-	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get token", err)
+		return
+	}
+
+	uuid, err := auth.ValidateJWT(token, cfg.token_secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate jwt token", err)
+		return
+	}
+
 	type parameters struct {
-		Body    string    `json:"body"`
-		User_ID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	// validating, get the body
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
@@ -35,7 +47,7 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 	//get it saved
 	chirp, err := cfg.dbQueries.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: params.User_ID,
+		UserID: uuid,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Chirp wasn't able to be saved", nil)
