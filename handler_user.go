@@ -121,3 +121,53 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: r_token,
 	})
 }
+
+func (cfg *apiConfig) handleEdits(w http.ResponseWriter, r *http.Request) {
+	// authentication
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get token", err)
+		return
+	}
+	uuid, err := auth.ValidateJWT(token, cfg.token_secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate jwt token", err)
+		return
+	}
+
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	hashed, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
+		return
+	}
+
+	user, err := cfg.dbQueries.EditUserByID(r.Context(), database.EditUserByIDParams{
+		Email:          params.Email,
+		HashedPassword: hashed,
+		ID:             uuid,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't edit user by id", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, User{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	})
+}
