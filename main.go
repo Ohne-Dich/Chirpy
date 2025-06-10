@@ -17,6 +17,7 @@ type apiConfig struct {
 	dbQueries      *database.Queries
 	platform       string
 	token_secret   string
+	polka_key      string
 }
 
 func main() {
@@ -40,11 +41,16 @@ func main() {
 	if secret == "" {
 		log.Fatalf("TOKEN_SECRET must be set")
 	}
+	polka_k := os.Getenv("POLKA_KEY")
+	if secret == "" {
+		log.Fatalf("POLKA_KEY must be set")
+	}
 
 	var apiCfg apiConfig
 	apiCfg.dbQueries = database.New(db)
 	apiCfg.platform = platform
 	apiCfg.token_secret = secret
+	apiCfg.polka_key = polka_k
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))

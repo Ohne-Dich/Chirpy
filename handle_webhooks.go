@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	auth "github.com/Ohne-Dich/Chirpy/internal"
 	"github.com/google/uuid"
 )
 
@@ -17,9 +18,18 @@ func (cfg *apiConfig) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	key, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get api key parameters", err)
+		return
+	}
+	if key != cfg.polka_key {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
