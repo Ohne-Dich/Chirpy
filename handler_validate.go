@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	auth "github.com/Ohne-Dich/Chirpy/internal"
 	"github.com/Ohne-Dich/Chirpy/internal/database"
@@ -63,6 +64,60 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 		User_id:    chirp.UserID,
 	})
 
+}
+
+func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	type returnVal struct {
+		Token string `json:"token"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get token", err)
+		return
+	}
+
+	dat, err := cfg.dbQueries.GetRefreshTokenByToken(r.Context(), token)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get refresh token", err)
+		return
+	}
+
+	if dat.RevokedAt.Valid {
+		respondWithError(w, http.StatusUnauthorized, "revoked token", nil)
+		return
+	}
+
+	if dat.ExpiresAt.Before(time.Now()) {
+		respondWithError(w, http.StatusUnauthorized, "expired token", nil)
+		return
+	}
+
+	new_token, err := auth.MakeJWT(dat.UserID, cfg.token_secret, time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to create token", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, returnVal{
+		Token: new_token,
+	})
+}
+
+func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
+	bearer, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get token", err)
+		return
+	}
+
+	err = cfg.dbQueries.SetRevokeRefreshToken(r.Context(), bearer)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get refresh token", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func cleanBody(body string) string {

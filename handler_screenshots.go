@@ -31,47 +31,54 @@ func (cfg *apiConfig) handlerUploadScreenshot(w http.ResponseWriter, r *http.Req
 	}
 
 	files := r.MultipartForm.File["screenshots"]
-	if len(files) == 0 {
-		http.Error(w, "Keine Dateien erhalten", http.StatusBadRequest)
-		return
-	}
-
-	sessionPath := "uploads/session"
-	os.MkdirAll(sessionPath, os.ModePerm)
-
-	for _, fh := range files {
-		file, err := fh.Open()
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
 		if err != nil {
 			continue
 		}
 		defer file.Close()
-
-		img, _, err := image.Decode(file)
-		if err != nil {
-			continue
+		if len(files) == 0 {
+			http.Error(w, "Keine Dateien erhalten", http.StatusBadRequest)
+			return
 		}
 
-		bounds := img.Bounds()
-		if crop.X < 0 || crop.Y < 0 || crop.X+crop.Width > bounds.Dx() || crop.Y+crop.Height > bounds.Dy() {
-			continue
+		sessionPath := "uploads/session"
+		os.MkdirAll(sessionPath, os.ModePerm)
+
+		for _, fh := range files {
+			file, err := fh.Open()
+			if err != nil {
+				continue
+			}
+			defer file.Close()
+
+			img, _, err := image.Decode(file)
+			if err != nil {
+				continue
+			}
+
+			bounds := img.Bounds()
+			if crop.X < 0 || crop.Y < 0 || crop.X+crop.Width > bounds.Dx() || crop.Y+crop.Height > bounds.Dy() {
+				continue
+			}
+
+			cropRect := image.Rect(crop.X, crop.Y, crop.X+crop.Width, crop.Y+crop.Height)
+			cropped := img.(interface {
+				SubImage(r image.Rectangle) image.Image
+			}).SubImage(cropRect)
+
+			outPath := filepath.Join(sessionPath, "cropped_"+fh.Filename)
+			outFile, err := os.Create(outPath)
+			if err != nil {
+				continue
+			}
+			defer outFile.Close()
+
+			png.Encode(outFile, cropped)
 		}
-
-		cropRect := image.Rect(crop.X, crop.Y, crop.X+crop.Width, crop.Y+crop.Height)
-		cropped := img.(interface {
-			SubImage(r image.Rectangle) image.Image
-		}).SubImage(cropRect)
-
-		outPath := filepath.Join(sessionPath, "cropped_"+fh.Filename)
-		outFile, err := os.Create(outPath)
-		if err != nil {
-			continue
-		}
-		defer outFile.Close()
-
-		png.Encode(outFile, cropped)
 	}
-
 	w.Write([]byte(fmt.Sprintf("%d Screenshot(s) verarbeitet und gespeichert", len(files))))
+
 }
 
 func handlerDownloadZip(w http.ResponseWriter, r *http.Request) {
