@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"time"
 
 	auth "github.com/Ohne-Dich/Chirpy/internal"
@@ -18,7 +19,12 @@ type returnVals struct {
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
-
+	author_id := r.URL.Query().Get("author_id")
+	sortDirection := "asc"
+	sortDirectionParam := r.URL.Query().Get("sort")
+	if sortDirectionParam == "desc" {
+		sortDirection = "desc"
+	}
 	chirps, err := cfg.dbQueries.GetChirps(r.Context())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
@@ -27,14 +33,23 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	var arr []returnVals
 
 	for _, chirp := range chirps {
-		arr = append(arr, returnVals{
-			Id:         chirp.ID,
-			Created_at: chirp.CreatedAt,
-			Updated_at: chirp.UpdatedAt,
-			Body:       chirp.Body,
-			User_id:    chirp.UserID,
-		})
+		if author_id == "" || author_id == chirp.UserID.String() {
+			arr = append(arr, returnVals{
+				Id:         chirp.ID,
+				Created_at: chirp.CreatedAt,
+				Updated_at: chirp.UpdatedAt,
+				Body:       chirp.Body,
+				User_id:    chirp.UserID,
+			})
+		}
 	}
+
+	sort.Slice(arr, func(i, j int) bool {
+		if sortDirection == "desc" {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
 
 	respondWithJSON(w, http.StatusOK, arr)
 }
