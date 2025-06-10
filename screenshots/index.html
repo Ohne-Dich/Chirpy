@@ -3,21 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <title>Screenshot-Upload</title>
+  <link href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet"/>
   <style>
     body {
       font-family: sans-serif;
       max-width: 800px;
       margin: 2rem auto;
     }
-    .preview img {
+    img {
       max-width: 100%;
-      transform: scale(0.35); /* 35% Vorschau */
-      transform-origin: top left;
-      border: 1px solid #ccc;
-      margin-top: 1rem;
     }
-    input[type="number"] {
-      width: 80px;
+    .crop-container {
+      margin: 1rem 0;
     }
   </style>
 </head>
@@ -25,35 +22,64 @@
   <h1>Screenshot hochladen & zuschneiden</h1>
 
   <form id="uploadForm">
-    <label>Bild auswählen:
-      <input type="file" name="screenshot" accept="image/*" required multiple>
+    <label>Mehrere Bilder auswählen:
+      <input type="file" id="fileInput" name="screenshots" accept="image/*" required multiple>
     </label><br><br>
 
-    <label>Crop-Höhe (Pixel von unten):
-      <input type="number" name="crop" id="cropInput" value="40" min="0">
-    </label><br><br>
-
-    <button type="submit">Hochladen</button>
+    <button type="submit">Alle hochladen</button>
   </form>
 
-  <div class="preview" id="previewContainer"></div>
+  <div class="crop-container">
+    <img id="imagePreview" style="display:none;">
+  </div>
 
   <hr>
 
   <button onclick="downloadZip()">📥 ZIP herunterladen</button>
 
+  <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
   <script>
-    const form = document.getElementById('uploadForm');
-    const previewContainer = document.getElementById('previewContainer');
+    const fileInput = document.getElementById('fileInput');
+    const imagePreview = document.getElementById('imagePreview');
+    let cropper = null;
+    let selectedFiles = [];
 
-    form.addEventListener('submit', async (e) => {
+    fileInput.addEventListener('change', () => {
+      selectedFiles = Array.from(fileInput.files);
+      if (selectedFiles.length === 0) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        imagePreview.src = reader.result;
+        imagePreview.style.display = 'block';
+
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(imagePreview, {
+          viewMode: 1,
+          aspectRatio: NaN,
+          autoCropArea: 1,
+        });
+      };
+      reader.readAsDataURL(selectedFiles[0]); // Vorschau anhand des ersten Bildes
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!cropper) return alert("Bitte zuerst ein Bild auswählen und zuschneiden.");
 
-      const fileInput = form.querySelector('input[type="file"]');
-      const cropInput = document.getElementById('cropInput');
+      const cropData = cropper.getData(true);
+      const cropRect = {
+        x: Math.round(cropData.x),
+        y: Math.round(cropData.y),
+        width: Math.round(cropData.width),
+        height: Math.round(cropData.height)
+      };
+
       const formData = new FormData();
-      formData.append('screenshot', fileInput.files[0]);
-      formData.append('crop', cropInput.value); // an Backend senden
+      selectedFiles.forEach(file => {
+        formData.append('screenshots', file);
+      });
+      formData.append('cropRect', JSON.stringify(cropRect));
 
       const response = await fetch('/api/upload_screenshot', {
         method: 'POST',
@@ -62,13 +88,6 @@
 
       const text = await response.text();
       alert(text);
-
-      // Preview anzeigen
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        previewContainer.innerHTML = `<img src="${e.target.result}" alt="Vorschau">`;
-      };
-      reader.readAsDataURL(fileInput.files[0]);
     });
 
     function downloadZip() {
